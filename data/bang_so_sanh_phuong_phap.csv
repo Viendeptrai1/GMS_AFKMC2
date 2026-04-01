@@ -1,0 +1,5 @@
+method,SSE_inertia,silhouette,davies_bouldin,n_iter
+GMS + AFK-MC2 (sub) + K-means (full),4468.9147,0.361583,0.891984,6
+AFK-MC2 (full) + K-means,4785.252,0.384365,0.927945,16
+K-means++,4469.0065,0.361398,0.89344,16
+K-means (random init),4468.9611,0.361472,0.892792,12

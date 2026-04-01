@@ -1,0 +1,266 @@
+TEN DE TAI DA CHOT
+
+Ứng dụng mô hình hỗn hợp Gaussian (GMM) trong phân cụm khách hàng
+
+
+GHI CHU CHUNG
+
+Trung tam de tai: bai toan ung dung — phan cum / phan khuc khach hang, cong cu chinh la GMM (hoc phan phoi du lieu, ho tro lay mau / khoi tao cum tuy pipeline cu the).
+- Muc tieu: hieu ly thuyet GMM, ap dung len du lieu khach hang (online_retail_II.csv -> RFM hoac tuong duong), danh gia ket qua va y nghia nghiep vu.
+- Trong bai viet, tap trung mo ta phuong phap va thuc nghiem cua nhom; tai lieu ben ngoai chi trich dan khi can (khong dat trung tam vao mot bai bao cu the).
+
+
+TOM TAT PAPER GOC MA MINH DA DOC XONG
+
+1. Bai toan
+- Paper giai bai toan phan khuc khach hang bang mo hinh RFM.
+- Van de ma tac gia nham den la K-means phu thuoc manh vao tam cum khoi tao, nen ket qua co the khong on dinh.
+
+2. Y tuong cot loi
+- Tac gia de xuat framework Gms-Afkmc2.
+- "Gms" = lay mau tap con tu du lieu goc bang Gaussian Mixture Model sao cho tap con giu duoc phan bo gan voi du lieu goc.
+- "Afkmc2" = dung ASSUMPTION-FREE K-MC2 de tao tam cum khoi tao tot hon K-means va K-means++.
+- Sau do dung cac tam cum duoc tao tren tap con de khoi tao va phan cum lai tren tap du lieu goc.
+
+3. Pipeline theo bai bao
+- Buoc 1: Chuyen bai toan ve bo thuoc tinh RFM.
+- Buoc 2: Dung GMM fit tren du lieu goc.
+- Buoc 3: Sinh cac sample tu GMM.
+- Buoc 4: Tim cac diem trong du lieu goc gan nhat voi cac sample de tao DSsample.
+- Buoc 5: Tren DSsample, dung Afkmc2 de tao cac tam cum khoi tao on dinh.
+- Buoc 6: Dung tiep Afkmc2 tren DSraw voi tam khoi tao vua co de lay ket qua phan khuc cuoi cung.
+
+4. Co so toan hoc xuat hien trong paper
+- Ham muc tieu cua K-means dua tren tong binh phuong sai so trong cum.
+- Elkan K-means duoc nhac den nhu cach tang toc bang bat dang thuc tam giac.
+- GMM duoc trinh bay qua phan bo Gaussian cho tung thanh phan va tong hop thanh Gaussian mixture.
+- Paper nhac toi toi uu log-likelihood va KL divergence trong mo ta GMM.
+- AFK-MC2 duoc mo ta qua phan bo q(x|c1), xich Markov va co che Monte Carlo de chon seed.
+
+5. Dong gop ma tac gia tuyen bo
+- Tao duoc seed tot hon cho phan cum.
+- Giam so vong lap sau khoi tao.
+- Nang chat luong segmentation so voi K-means va K-means++.
+- Tim duoc sample rate hop ly, tac gia chon 0.5 la diem can bang tot.
+
+
+DU LIEU DA CHOT CHO DE TAI (CUA NHOM)
+
+- File: online_retail_II.csv (nam o thu muc goc project GMS_AFKMC2, cung cap voi workspace).
+- Quy mo khoang: ~1,067,371 dong (gom 1 dong header), tuong ung ban ghi giao dich muc hang.
+- Cac cot trong file:
+  - Invoice: ma hoa don
+  - StockCode, Description: ma va mo ta hang
+  - Quantity: so luong
+  - InvoiceDate: thoi gian giao dich
+  - Price: don gia
+  - Customer ID: dinh danh khach (float trong file, co the NaN)
+  - Country: quoc gia
+- Huong xu ly de co bang khach hang cho phan cum (RFM), can ghi ro trong bai:
+  - Bo cac dong thieu Customer ID (khong gan duoc RFM cho khach vo danh).
+  - Xu ly giao dich huy: voi Online Retail II, hoa don bat dau bang chu "C" thuong la huy — can quyet dinh va mo ta ro (loc bo hay xu ly rieng).
+  - Monetary: thuong tong (Quantity * Price) theo khach (chi tinh dong hop le).
+  - Frequency: thuong so hoa don khac nhau theo khach, hoac so lan mua — chot 1 dinh nghia va thong nhat suot bai.
+  - Recency: khoang cach tu "ngay tham chieu" (vi du ngay giao dich moi nhat trong tap) den ngay mua gan nhat cua khach — don vi ngay.
+- Sau khi gom theo Customer ID, so khach hang se giam manh so voi so dong giao dich; co the gan voi muc quy mo paper neu tien xu ly tuong tu.
+
+
+DATASET VA THIET LAP THUC NGHIEM THEO PAPER
+
+1. Dataset 1 (paper) — trung khop voi nguon ta dang dung
+- Ten mo ta trong paper: online retail II dataset from Kaggle.
+- Quy mo paper ghi: 5878 khach hang, hon 1.04 trieu ban ghi giao dich.
+- Tien xu ly paper ghi:
+  - Lam sach du lieu.
+  - Loai ban ghi trung lap.
+  - Dien gia tri thieu.
+  - Tao Dataset 1 cuoi cung dua tren RFM.
+
+2. Dataset 2 (paper — tuy chon cho de tai cua minh)
+- Paper con dung them mot bo 10,000 khach hang tren Kaggle, khong dinh danh ro.
+- De tai "Ung dung GMM trong phan cum khach hang" co the CHI lam tren online_retail_II.csv; neu chi lam 1 bo thi ghi ro trong bai la pham vi thuc nghiem hep hon paper, khong bat buoc tai hien bang so lieu Dataset 2.
+
+3. Thuoc tinh du lieu
+- Customer ID
+- Recently Purchased Time = Recency
+- Frequency of Purchase = Frequency
+- Purchase Amount = Monetary
+
+4. So cum
+- Tac gia dung elbow method.
+- Ket luan k = 4 cho ca hai dataset.
+
+5. Sample rate duoc thu
+- 1, 0.8, 0.6, 0.5, 0.4, 0.2, 0.1, 0.05
+- Tac gia ket luan 0.5 la su danh doi tot hon giua runtime, so vong lap va chat luong cum.
+
+6. Cac phuong phap duoc so sanh
+- Gms-Afkmc2
+- K-means++
+- K-means
+
+7. Metric danh gia
+- SSE
+- Silhouette Coefficient (SH)
+- Davies-Bouldin Index (DBI)
+- Runtime
+
+
+KET QUA CHINH CUA PAPER
+
+1. Ket qua Dataset 1
+- Gms-Afkmc2: SSE = 28.19, SH = 0.92, DBI = 0.42, Runtime = 0.018
+- K-means++: SSE = 29.57, SH = 0.90, DBI = 0.44, Runtime = 0.008
+- K-means: SSE = 31.25, SH = 0.89, DBI = 0.52, Runtime = 0.051
+
+2. Ket qua Dataset 2
+- Gms-Afkmc2: SSE = 241.423, SH = 0.355, DBI = 1.065, Runtime = 0.026
+- K-means++: SSE = 245.745, SH = 0.352, DBI = 1.067, Runtime = 0.013
+- K-means: SSE = 248.131, SH = 0.347, DBI = 1.071, Runtime = 0.0750
+
+3. Dien giai ket qua
+- Theo paper, Gms-Afkmc2 cho ket qua phan cum tot hon nhin theo SSE va SH.
+- So vong lap sau khoi tao giam khi sample rate lon hon.
+- Doi lai, runtime tao tap con va seed tang len.
+
+
+NHUNG DIEM PAPER MO TA CHUA DU DE TAI HIEN "Y CHANG"
+
+1. Dataset 2 chua duoc dinh danh ro
+- Chi biet do la "public customer segmentation dataset from Kaggle" voi 10,000 khach hang.
+- Chua co link chinh xac.
+- Chua co ten file, cot du lieu goc, hay cach bien doi sang RFM.
+
+2. Tien xu ly Dataset 1 chua day du
+- Chua noi ro cach xu ly giao dich huy/tra hang.
+- Chua noi ro moc thoi gian de tinh Recency.
+- Chua noi ro cach dien missing value cu the.
+- Chua noi ro co loc khach hang khong hop le hay khong.
+
+3. Chuan hoa du lieu chua duoc mo ta ro
+- Trong gia ma co bien DSnorm, nhung paper khong noi ro dung Min-Max, Z-score hay cach khac.
+
+4. Vector trong so omega chua duoc mo ta ro
+- Paper noi co weight of each component.
+- Nhung khong noi ro omega la do nguoi dung dat the nao, co phai [wr, wf, wm] hay cach xac dinh tu du lieu.
+
+5. Cau hinh GMM chua day du
+- So thanh phan mixture khong noi ro.
+- covariance_type khong noi ro.
+- random_state khong noi ro.
+- so lan EM hoi tu, tieu chi dung, init params khong noi ro.
+
+6. Cau hinh AFK-MC2 chua day du
+- Paper noi dung thu vien kmc2-0.1.
+- Nhung khong ghi ro chain length, tham so khoi tao, random seed, cach goi ham cu the.
+
+7. Van de ve metric DBI
+- Paper viet o bang mau la "DBI down", tuc la nho hon thi tot hon, day moi la cach hieu chuan.
+- Nhung trong phan mo ta van ban co cau "When the index is larger, the clusters are better", cau nay sai voi dinh nghia thong dung cua Davies-Bouldin.
+- O bang so sanh cuoi, huong mui ten cua DBI cung bi ghi khong nhat quan.
+- Khi tai hien, can thong nhat: DBI nho hon la tot hon.
+
+8. Runtime trong paper rat nho
+- Paper bao runtime o muc 0.018, 0.026,...
+- Chua ro moi truong phan cung, phien ban thu vien, cach do thoi gian.
+- Vi vay runtime co the kho doi chinh xac 100%, ta nen uu tien tai lap xu huong hon la so tuyet doi.
+
+
+NHAN XET HOC THUAT QUAN TRONG CHO DE TAI MON TOAN CHO AI
+
+1. Diem hay de khai thac
+- Bai nay hop voi mon Toan cho AI vi co nhieu thanh phan toan hoc:
+  - Toi uu ham muc tieu cua K-means.
+  - Bat dang thuc tam giac trong Elkan K-means.
+  - Mo hinh xac suat GMM.
+  - Log-likelihood, EM, KL divergence.
+  - Xich Markov va Monte Carlo trong AFK-MC2.
+
+2. Diem can viet can than
+- Mo ta pipeline bang so do va trinh bay ro tung buoc (du lieu -> RFM -> GMM -> phan cum -> danh gia).
+- Moi buoc tien xu ly va chon tham so can neu ly do, tranh chi "chay thu roi chon".
+
+
+BO CUC TIEN LUAN DE XUAT
+
+1. Tom tat
+- Bai toan ung dung phan cum khach hang, vai tro GMM, nguon du lieu (Online Retail II), ket qua va y nghia ngan gon.
+
+2. Gioi thieu
+- Bai toan phan khuc khach hang va y nghia thuc tien (marketing, uu tien khach hang).
+- Ly do chon mo hinh dua tren GMM trong chuoi xu ly phan cum.
+- RFM nhu tap dac trung khach hang; gioi han cua K-means thuan (seed, nhay cam tien xu ly) neu can lam ly do mo rong phuong phap.
+
+3. Co so ly thuyet
+- RFM model.
+- K-means va ham muc tieu.
+- K-means++.
+- Elkan K-means.
+- Gaussian Mixture Model.
+- EM va KL divergence.
+- AFK-MC2, xich Markov, Monte Carlo.
+- Cac metric SSE, SH, DBI.
+
+4. Phuong phap de xuat / pipeline ung dung
+- Mo ta so do tong quat: tu du lieu giao dich -> tien xu ly -> bang khach hang + RFM.
+- Vai tro GMM trong bai (vi du: uoc luong phan phoi, lay mau tap con, hoac khoi tao cum — chot dung mot cach va mo ta ro).
+- Buoc phan cum cuoi (K-means / bien the da chon) va cac baseline so sanh neu co (K-means++, v.v.).
+- Ly do chon tung thanh phan trong pipeline.
+
+5. Thiet ke thuc nghiem
+- Mo ta tap du lieu online_retail_II.csv, cac buoc lam sach va quy uoc R/F/M.
+- Chon so cum k (elbow hoac tieu chi khac), ly do.
+- Cac phuong phap / cau hinh chay thu (GMM, cum, sieu tham so).
+- Chi so danh gia: SSE, Silhouette, Davies-Bouldin, thoi gian chay (neu can).
+
+6. Chi tiet cai dat
+- Moi truong, thu vien (Python, sklearn, ...).
+- Ma hoa / chuan hoa dac trung.
+- Tham so GMM, K-means, AFK-MC2 (neu dung) va cach chon.
+- Cac lua chon ky thuat va giai thich ngan.
+
+7. Ket qua va phan tich
+- Bang so sanh metric giua cac phuong phap.
+- Hinh elbow (neu dung).
+- Phan bo cum, kich thuoc cum.
+- Thong ke RFM (trung binh, trung vi) theo cum — dien giai nghiep vu tung nhom khach.
+
+8. Thao luan
+- Nhan xet chat luong cum, do on dinh khi doi seed hoac tien xu ly nhe.
+- Anh huong cua chuan hoa va cua cac tham so GMM (neu thu nhieu muc).
+- Han che cua du lieu va cua phuong phap.
+- So sanh uu nhuoc giua cac phuong phap da thu.
+
+9. Ket luan
+- Tom tat dong gop thuc nghiem va ket luan ung dung.
+- Gioi han de tai.
+- Huong mo rong (du lieu khac, thu them bien phap danh gia, v.v.).
+
+
+TEN PHU (NEU GIAO VIEN YEU CAU PHU DE NGAN HON)
+
+- Ung dung GMM trong phan khuc khach hang
+- Phan cum khach hang dua tren mo hinh hon hop Gaussian (GMM)
+
+
+CHECKLIST CONG VIEC TIEP THEO
+
+[x] Du lieu goc: online_retail_II.csv (trong project).
+[ ] (Tuy chon) Them mot bo du lieu thu hai neu muon mo rong thuc nghiem; neu khong thi ghi ro pham vi chi dung mot bo.
+[ ] Chot cong thuc tinh Recency, Frequency, Monetary.
+[ ] Chot cach chuan hoa du lieu.
+[ ] Chot cau hinh GMM va (neu dung) trong so / buoc lay mau.
+[ ] Chot cach goi AFK-MC2 trong Python (neu pipeline co buoc nay).
+[ ] Chay elbow (hoac tieu chi khac) de chon k.
+[ ] Thu tac dong cua ty le lay mau hoac tham so GMM neu co trong pipeline.
+[ ] Bang so sanh metric giua cac phuong phap da chon (vi du baseline K-means, K-means++).
+[ ] Hoan thien muc thao luan: do on dinh, han che, huong mo rong.
+
+
+GHI CHU QUAN TRONG
+
+Voi de tai da chot (xem dong tieu de phia tren), uu tien:
+- chot du lieu va tien xu ly,
+- mo ta ro vai tro GMM va toan bo pipeline phan cum,
+- bao cao ket qua trung thuc va dien giai nghiep vu theo tung cum.
+
