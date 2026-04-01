@@ -18,7 +18,7 @@ Dự án thực nghiệm trên dữ liệu **Online Retail II** (`online_retail_
 | 8 | Thảo luận | [§8](#8-thảo-luận) |
 | 9 | Kết luận | [§9](#9-kết-luận) |
 
-**Hình minh họa:** chạy xong các notebook (đặc biệt `04_KetQuaVaTrucQuan.ipynb`) để sinh file trong thư mục [`figures/`](figures/). Nếu chưa chạy, các ảnh dưới sẽ không hiển thị trong một số trình xem Markdown.
+**Hình minh họa:** chạy xong các notebook (đặc biệt [`notebooks/online_retail/04_KetQuaVaTrucQuan.ipynb`](notebooks/online_retail/04_KetQuaVaTrucQuan.ipynb)) để sinh file trong thư mục [`figures/`](figures/). Nếu chưa chạy, các ảnh dưới sẽ không hiển thị trong một số trình xem Markdown.
 
 ---
 
@@ -41,7 +41,7 @@ Phân khúc khách hàng hỗ trợ chiến lược marketing (ưu tiên nhóm g
 
 Phần này chỉ nêu **đủ để nối với code**; không thay cho giáo trình đầy đủ về EM, MCMC, v.v.
 
-### 3.1 Notebook `01_DataProcessing.ipynb` — RFM và chuẩn hóa
+### 3.1 Notebook `notebooks/online_retail/01_DataProcessing.ipynb` — RFM và chuẩn hóa
 
 **Tiền xử lý dòng giao dịch**
 
@@ -81,7 +81,7 @@ Phần này chỉ nêu **đủ để nối với code**; không thay cho giáo t
   (trung bình mẫu \(\mu\), độ lệch chuẩn mẫu \(\sigma\) theo cột).  
 - Output: `data/rfm_customers.csv` với các cột `R, F, M`, `F_log1p`, `M_log1p`, `R_z`, `F_z`, `M_z`.
 
-### 3.2 Notebook `02_GMM.ipynb` — hỗn hợp Gaussian
+### 3.2 Notebook `notebooks/online_retail/02_GMM.ipynb` — hỗn hợp Gaussian
 
 **Mô hình** (sklearn: `GaussianMixture`)
 
@@ -94,7 +94,7 @@ p(\mathbf{x}) = \sum_{j=1}^{J} w_j \,\mathcal{N}(\mathbf{x} \mid \boldsymbol{\mu
 **Đầu vào:** ma trận \([\texttt{R\_z}, \texttt{F\_z}, \texttt{M\_z}]\).  
 **Output:** `models/gmm_rfm.joblib`, `data/rfm_with_gmm.csv`, `data/gmm_model_selection.csv`.
 
-### 3.3 Notebook `03_AFKMC2.ipynb` — GMS, AFK-MC2, K-means
+### 3.3 Notebook `notebooks/online_retail/03_AFKMC2.ipynb` — GMS, AFK-MC2, K-means
 
 **GMS (ánh xạ mẫu GMM → điểm thật)**  
 Với mỗi mẫu \(\mathbf{s}\) sinh từ GMM đã fit, chọn chỉ số hàng \(\ell\) sao cho khoảng cách Euclidean có trọng số \(\boldsymbol{\omega}\) nhỏ nhất:
@@ -117,7 +117,7 @@ với \(c(i)\) là cụm gán cho điểm \(i\), \(\boldsymbol{\mu}\) là tâm c
 
 **Output:** `data/kmeans_init_comparison.csv`, `data/rfm_with_kmeans_clusters.csv`.
 
-### 3.4 Notebook `04_KetQuaVaTrucQuan.ipynb` — metric trực quan
+### 3.4 Notebook `notebooks/online_retail/04_KetQuaVaTrucQuan.ipynb` — metric trực quan
 
 - **Silhouette** (sklearn): đo mức độ “gắn” cụm của mình so với cụm láng giềng; **cao hơn** thường tốt hơn (trong khoảng \([-1,1]\)).  
 - **Davies–Bouldin** (sklearn): **nhỏ hơn** tốt hơn.
@@ -156,7 +156,7 @@ flowchart LR
 |----------|----------|
 | Dữ liệu | `online_retail_II.csv` → khách hàng cấp RFM |
 | Đặc trưng phân cụm | `R_z`, `F_z`, `M_z` |
-| Số cụm K-means | `k = 4` (có thể đổi trong `03_AFKMC2.ipynb`) |
+| Số cụm K-means | `k = 4` (có thể đổi trong `notebooks/online_retail/03_AFKMC2.ipynb` hoặc bản `customer_data`) |
 | GMM (GMS / NB2) | Ưu tiên load `models/gmm_rfm.joblib`; không có thì fit fallback |
 | Tỷ lệ lấy mẫu GMS | `SAMPLE_RATE = 0.5` |
 | AFK-MC2 | `m = 200` (chuỗi Markov) |
@@ -176,10 +176,12 @@ python3 -m pip install -r requirements.txt
 
 **Thứ tự chạy**
 
-1. `01_DataProcessing.ipynb` → `data/rfm_customers.csv`  
-2. `02_GMM.ipynb` → `models/gmm_rfm.joblib`, `data/rfm_with_gmm.csv`, …  
-3. `03_AFKMC2.ipynb` → `data/kmeans_init_comparison.csv`, `data/rfm_with_kmeans_clusters.csv`  
-4. `04_KetQuaVaTrucQuan.ipynb` → bảng CSV bổ sung + **`figures/*.png`**
+1. `notebooks/online_retail/01_DataProcessing.ipynb` → `data/rfm_customers.csv`  
+2. `notebooks/online_retail/02_GMM.ipynb` → `models/gmm_rfm.joblib`, `data/rfm_with_gmm.csv`, …  
+3. `notebooks/online_retail/03_AFKMC2.ipynb` → `data/kmeans_init_comparison.csv`, `data/rfm_with_kmeans_clusters.csv`  
+4. `notebooks/online_retail/04_KetQuaVaTrucQuan.ipynb` → bảng CSV bổ sung + **`figures/*.png`**
+
+Luồng tương tự trên `customer_data.csv`: chạy lần lượt các file trong [`notebooks/customer_data/`](notebooks/customer_data/) (01–04 `*_customer_data.ipynb`); kết quả ghi vào `data_customer/`, `models_customer/`, `figures_customer/` (không đè lên Online Retail).
 
 **Cấu trúc thư mục (chính)**
 
@@ -188,14 +190,17 @@ GMS_AFKMC2/
 ├── README.md
 ├── requirements.txt
 ├── online_retail_II.csv
-├── 01_DataProcessing.ipynb
-├── 02_GMM.ipynb
-├── 03_AFKMC2.ipynb
-├── 04_KetQuaVaTrucQuan.ipynb
-├── data/                 # CSV đầu ra
-├── models/               # GMM joblib
-├── figures/              # hình (sau NB4)
-└── paper/                # đề cương, PDF tham khảo
+├── customer_data.csv     # tùy chọn: luồng notebook customer_data
+├── notebooks/
+│   ├── online_retail/    # 01–04 Online Retail
+│   └── customer_data/    # 01–04 customer_data (song song)
+├── data/                 # CSV đầu ra (Online Retail)
+├── data_customer/        # CSV đầu ra (customer_data)
+├── models/
+├── models_customer/
+├── figures/
+├── figures_customer/
+└── paper/
 ```
 
 ---
@@ -234,7 +239,7 @@ GMS_AFKMC2/
 - `data/bang_profile_rfm_theo_cum.csv`  
 - `data/bang_phan_tram_cum_theo_phuong_phap.csv`  
 
-*(Chạy `04_KetQuaVaTrucQuan.ipynb` để cập nhật.)*
+*(Chạy `notebooks/online_retail/04_KetQuaVaTrucQuan.ipynb` để cập nhật.)*
 
 ---
 
