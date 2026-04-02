@@ -76,9 +76,8 @@ DATASET VA THIET LAP THUC NGHIEM THEO PAPER
   - Dien gia tri thieu.
   - Tao Dataset 1 cuoi cung dua tren RFM.
 
-2. Dataset 2 (paper — tuy chon cho de tai cua minh)
-- Paper con dung them mot bo 10,000 khach hang tren Kaggle, khong dinh danh ro.
-- De tai "Ung dung GMM trong phan cum khach hang" co the CHI lam tren online_retail_II.csv; neu chi lam 1 bo thi ghi ro trong bai la pham vi thuc nghiem hep hon paper, khong bat buoc tai hien bang so lieu Dataset 2.
+2. Dataset 2 (paper — khong lam trong project GMS_AFKMC2)
+- Paper con dung them mot bo 10,000 khach hang tren Kaggle; codebase / bao cao hien chi thuc nghiem tren online_retail_II.csv (pham vi hep hon paper, khong tai hien bang so lieu Dataset 2).
 
 3. Thuoc tinh du lieu
 - Customer ID

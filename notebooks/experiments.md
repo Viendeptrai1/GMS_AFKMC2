@@ -1,8 +1,8 @@
 # CHƯƠNG 4 THIẾT KẾ VÀ THỰC NGHIỆM
 
-Chương này trình bày **thiết kế thực nghiệm** và **kết quả định lượng** cho bài toán phân khúc khách hàng theo mô hình RFM, với chuỗi xử lý: làm sạch dữ liệu → xây vector RFM → ước lượng phân phối bằng GMM → lấy mẫu tập con (GMS) → khởi tạo tâm cụm bằng AFK-MC2 trên tập con → phân cụm toàn bộ bằng K-means kiểu Elkan. Nhóm thực hiện **hai luồng song song** trên cùng một codebase notebook: một luồng xuất phát từ **lịch sử giao dịch thô** (hàng trăm nghìn dòng dòng sản phẩm trên hóa đơn), một luồng xuất phát từ **bảng khách đã tổng hợp** (một dòng trên mỗi khách). Việc đặt song song hai nguồn giúp kiểm tra xem pipeline có **ổn định** khi dữ liệu đầu vào thay đổi về mức chi tiết hay không, đồng thời vẫn giữ nguyên các chỉ số đánh giá (SSE, Silhouette, Davies–Bouldin, số vòng lặp K-means) để so sánh công bằng.
+Chương này trình bày **thiết kế thực nghiệm** và **kết quả định lượng** cho bài toán phân khúc khách hàng theo mô hình RFM, với chuỗi xử lý: làm sạch dữ liệu → xây vector RFM → ước lượng phân phối bằng GMM → lấy mẫu tập con (GMS) → khởi tạo tâm cụm bằng AFK-MC2 trên tập con → phân cụm toàn bộ bằng K-means kiểu Elkan. Thực nghiệm thực hiện trên **lịch sử giao dịch thô** (hàng trăm nghìn dòng sản phẩm trên hóa đơn) của **Online Retail II**, gom về cấp khách hàng trước khi tính RFM.
 
-Các số liệu tổng hợp trong chương được lấy từ các file CSV sinh ra sau khi chạy notebook (thư mục `data/` và `data_customer/`). **Các biểu đồ** dùng trong báo cáo là hình PNG do notebook `04_KetQuaVaTrucQuan` xuất ra; nếu trong máy bạn chưa thấy file ảnh, hãy chạy lần lượt notebook kết quả tương ứng để tạo lại thư mục `figures/` và `figures_customer/` ở gốc project.
+Các số liệu tổng hợp trong chương được lấy từ các file CSV sinh ra sau khi chạy notebook (thư mục `data/`). **Các biểu đồ** dùng trong báo cáo là hình PNG do notebook `04_KetQuaVaTrucQuan` xuất ra; nếu trong máy bạn chưa thấy file ảnh, hãy chạy lần lượt notebook kết quả tương ứng để tạo lại thư mục `figures/` ở gốc project.
 
 ## 4.1. Dataset and Evaluation Metrics
 
@@ -77,61 +77,20 @@ flowchart LR
 
 **Mục tiêu của output.** (1) Có một **tập khách đã gán cụm** để diễn giải nghiệp vụ; (2) có **bằng chứng số** so sánh pipeline đề xuất với các baseline trên cùng một tập giao dịch thật, tránh kết luận chỉ dựa trực quan.
 
-### 4.1.2. Tập dữ liệu khách hàng marketing đa kênh
+### 4.1.2. Pipeline thực nghiệm (tóm tắt theo bước)
 
-*Bảng khách hàng tổng hợp (một dòng / khách), trong đề tài lưu dưới tên file `customer_data.csv`; dùng làm bộ đối chiếu ở mức customer-level.*
+| Bước | Nội dung (Online Retail II) | Đầu ra |
+|---|---|---|
+| 1. Preprocessing | Lọc thiếu `Customer ID`, hóa đơn hủy, giá trị `Quantity` hoặc `Price` không hợp lệ | Bảng giao dịch sạch |
+| 2. Tạo RFM | `R = t_ref - max(InvoiceDate)`, `F = #Invoice`, `M = sum(Quantity × Price)` | Bảng khách hàng cấp RFM |
+| 3. Biến đổi đặc trưng | `log1p(F)`, `log1p(M)` | Giảm lệch phải của `F` và `M` |
+| 4. Chuẩn hóa | `StandardScaler` trên `(R, F_log1p, M_log1p)` | `R_z`, `F_z`, `M_z` |
+| 5. GMM model selection | BIC tốt nhất tại **12** thành phần (trong grid đã chạy) | Mô hình GMM phục vụ GMS |
+| 6. GMS sub-sampling | `sample_rate = 0.5` → **2,939 / 5,878** khách | Tập con bám phân phối GMM |
+| 7. AFK-MC2 seeding | `k = 4`, `m = 200` | Tâm khởi tạo cho K-means |
+| 8. Phân cụm cuối | Elkan K-means trên toàn bộ RFM chuẩn hóa | 4 cụm khách hàng |
 
-Tập này mô phỏng tình huống doanh nghiệp đã **tổng hợp sẵn** hành vi mua: recency, số lần mua theo kênh và tổng chi tiêu nằm ngay trên một dòng khách. Do đó bước “tiền xử lý” không còn là gom từ hàng triệu dòng SKU, mà chủ yếu là **kiểm tra kiểu dữ liệu**, đảm bảo các cột dùng để ghép thành `F` và `M` nhất quán, rồi **ánh xạ trực tiếp** sang RFM theo quy ước đã thống nhất với luồng Online Retail (log1p + StandardScaler). Điều này giúp nhóm tách bạch hai câu hỏi: (a) pipeline có chạy ổn trên dữ liệu “đẹp” cấp khách không; (b) khi chuyển sang dữ liệu giao dịch thô, **cùng một pipeline** có còn giữ được lợi thế hay không.
-
-| Mục | Mô tả |
-|---|---|
-| Mức hạt dữ liệu | Bảng khách hàng, một dòng trên mỗi khách |
-| Kích thước gốc | **10,000** dòng, **42** cột |
-| Trường chính (dùng cho RFM) | `Customer_ID`, `Last_Purchase_Recency`, `Web_Purchases`, `Catalog_Purchases`, `Store_Purchases`, `Deals_Purchased`, `Total_Amount_Spent` |
-| Thuộc tính bổ sung | `Education_Level`, `Marital_Status`, `Annual_Income`, `Membership_Tier`, `Device_Type`, … |
-| Chất lượng dữ liệu gốc | Không có giá trị khuyết thiếu và không ghi nhận dòng trùng lặp |
-| Mapping sang RFM | `R = Last_Purchase_Recency`, `F = Web + Catalog + Store + Deals`, `M = Total_Amount_Spent` |
-| Dữ liệu sau tiền xử lý | **10,000** khách hợp lệ, **5** quốc gia |
-| Đầu ra trung gian | `data_customer/rfm_customers.csv`, `data_customer/gmm_model_selection.csv`, `data_customer/kmeans_init_comparison.csv` |
-
-#### Mẫu dữ liệu trước và sau tiền xử lý (khách hàng đa kênh)
-
-**Trước — ba dòng đầu trong `customer_data.csv` (chỉ hiển thị các cột dùng để dựng RFM và quốc gia):** dữ liệu đã là cấp khách; `F` chưa được tính tổng mà nằm rời rạc theo kênh.
-
-| Customer_ID | Last_Purchase_Recency | Web_Purchases | Catalog_Purchases | Store_Purchases | Deals_Purchased | Total_Amount_Spent | Country |
-|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | 68 | 3 | 2 | 2 | 5 | 1265 | Germany |
-| 2 | 99 | 1 | 5 | 0 | 6 | 1647 | UK |
-| 3 | 63 | 7 | 6 | 5 | 1 | 1806 | Brazil |
-
-**Sau — cùng các khách trong `data_customer/rfm_customers.csv`:** `F` là tổng các kênh (cộng thêm `Deals_Purchased`), `M` lấy trực tiếp từ `Total_Amount_Spent`, kèm biến đổi `log1p` và z-score như luồng Online Retail.
-
-| customer_id | R | F | M | F_log1p | M_log1p | R_z | F_z | M_z |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 68 | 12 | 1265.0 | 2.56 | 7.14 | 0.63 | -0.95 | -0.29 |
-| 2 | 99 | 12 | 1647.0 | 2.56 | 7.41 | 1.70 | -0.95 | 0.56 |
-| 3 | 63 | 19 | 1806.0 | 3.00 | 7.50 | 0.46 | 0.31 | 0.85 |
-
-**Đầu vào (Input).** Bảng khách đa thuộc tính `customer_data.csv`.
-
-**Đầu ra (Output).** Cùng họ file như luồng Online Retail nhưng trong `data_customer/`, bảo đảm không ghi đè kết quả tập kia.
-
-**Mục tiêu của output.** So sánh **cùng một pipeline** khi đầu vào ở hai mức chi tiết khác nhau; đồng thời vẫn thu được nhãn cụm để gắn với chiến lược đa kênh (ưu tiên kênh có đóng góp `F` cao trong từng cụm — phần diễn giải sâu hơn có thể mở rộng ngoài phạm vi RFM thuần trong notebook hiện tại).
-
-### 4.1.3. Pipeline thực nghiệm (tóm tắt theo bước)
-
-| Bước | Online Retail II (`online_retail_II.csv`) | Khách hàng đa kênh (`customer_data.csv`) | Đầu ra |
-|---|---|---|---|
-| 1. Preprocessing | Lọc thiếu `Customer ID`, hóa đơn hủy, giá trị `Quantity` hoặc `Price` không hợp lệ | Kiểm tra kiểu dữ liệu, đảm bảo cột dùng cho RFM hợp lệ | Bảng sạch cho phân tích |
-| 2. Tạo RFM | `R = t_ref - max(InvoiceDate)`, `F = #Invoice`, `M = sum(Quantity × Price)` | `R = Last_Purchase_Recency`, `F = Web + Catalog + Store + Deals`, `M = Total_Amount_Spent` | Bảng khách hàng cấp RFM |
-| 3. Biến đổi đặc trưng | `log1p(F)`, `log1p(M)` | `log1p(F)`, `log1p(M)` | Giảm lệch phải của `F` và `M` |
-| 4. Chuẩn hóa | `StandardScaler` trên `(R, F_log1p, M_log1p)` | `StandardScaler` trên `(R, F_log1p, M_log1p)` | `R_z`, `F_z`, `M_z` |
-| 5. GMM model selection | BIC tốt nhất tại **12** thành phần | BIC tốt nhất tại **11** thành phần | Mô hình GMM phục vụ GMS |
-| 6. GMS sub-sampling | `sample_rate = 0.5` → **2,939 / 5,878** khách | `sample_rate = 0.5` → **5,000 / 10,000** khách | Tập con bám phân phối GMM |
-| 7. AFK-MC2 seeding | `k = 4`, `m = 200` | `k = 4`, `m = 200` | Tâm khởi tạo cho K-means |
-| 8. Phân cụm cuối | Elkan K-means trên toàn bộ RFM chuẩn hóa | Elkan K-means trên toàn bộ RFM chuẩn hóa | 4 cụm khách hàng |
-
-### 4.1.4. Chỉ số đánh giá
+### 4.1.3. Chỉ số đánh giá
 
 Các notebook xuất đầy đủ bốn đại lượng dưới đây; nhóm **không báo cáo runtime** vì môi trường phần cứng khác nhau sẽ làm sai lệch số tuyệt đối, trong khi các chỉ số dưới đây vẫn so sánh được trên cùng một lần chạy.
 
@@ -142,13 +101,13 @@ Các notebook xuất đầy đủ bốn đại lượng dưới đây; nhóm **k
 | `Davies-Bouldin` | Mức chồng lấn giữa các cụm | Thấp hơn |
 | `n_iter` | Số vòng lặp Elkan K-means đến khi hội tụ | Thấp hơn |
 
-*Đường dẫn hình ảnh trong các mục sau dùng dạng `../figures/...` và `../figures_customer/...` (tương đối từ file `notebooks/experiments.md`). Nếu bạn dựng báo cáo từ thư mục gốc project, có thể đổi tương đương thành `figures/...` và `figures_customer/...`.*
+*Đường dẫn hình ảnh trong các mục sau dùng dạng `../figures/...` (tương đối từ file `notebooks/experiments.md`). Nếu bạn dựng báo cáo từ thư mục gốc project, có thể đổi tương đương thành `figures/...`.*
 
 ## 4.2. Experiment Analysis
 
-Phần này trình bày **kết quả định lượng** sau khi chạy đủ pipeline. Nhóm không chỉ dừng ở một chỉ số: `SSE` phản ánh mức “khớp” của K-means với cấu trúc cụm theo khoảng cách Euclidean, trong khi `Silhouette` và `Davies-Bouldin` bổ sung góc nhìn về **độ tách cụm**; `n_iter` cho biết sau khi khởi tạo, thuật toán Lloyd/Elkan cần bao nhiêu vòng để ổn định — đây là chi phí tính toán trực tiếp liên quan đến seeding. Các biểu đồ cột trong hình `so_sanh_metric_phuong_phap.png` (mỗi tập dữ liệu một bản trong thư mục hình tương ứng) tổng hợp trực quan bốn đại lượng này cho bốn cách khởi tạo đã cài đặt trong notebook `03`.
+Phần này trình bày **kết quả định lượng** sau khi chạy đủ pipeline. Nhóm không chỉ dừng ở một chỉ số: `SSE` phản ánh mức “khớp” của K-means với cấu trúc cụm theo khoảng cách Euclidean, trong khi `Silhouette` và `Davies-Bouldin` bổ sung góc nhìn về **độ tách cụm**; `n_iter` cho biết sau khi khởi tạo, thuật toán Lloyd/Elkan cần bao nhiêu vòng để ổn định — đây là chi phí tính toán trực tiếp liên quan đến seeding. Biểu đồ cột trong hình `so_sanh_metric_phuong_phap.png` tổng hợp trực quan bốn đại lượng này cho bốn cách khởi tạo đã cài đặt trong notebook `03`.
 
-### 4.2.1. Online Retail II — so sánh phương pháp
+### 4.2.1. So sánh phương pháp
 
 | Phương pháp | SSE | Silhouette | Davies-Bouldin | `n_iter` |
 |---|---:|---:|---:|---:|
@@ -167,56 +126,27 @@ Trên tập giao dịch thật, pipeline **GMS + AFK-MC2** đạt `SSE` và `Dav
 
 *Hình 2. Cơ cấu phần trăm khách theo từng cụm khi đổi cách khởi tạo; giúp thấy một số phương pháp hoán đổi “nhãn cụm” nhưng tỷ lệ có thể khác nhau (nguồn: `figures/heatmap_co_cau_cum_theo_phuong_phap.png`).*
 
-### 4.2.2. Khách hàng đa kênh — so sánh phương pháp
-
-| Phương pháp | SSE | Silhouette | Davies-Bouldin | `n_iter` |
-|---|---:|---:|---:|---:|
-| GMS + AFK-MC2 (sub) + K-means (full) | 13766.297 | 0.2860 | 1.0568 | **14** |
-| AFK-MC2 (full) + K-means | 13763.821 | 0.2862 | 1.0572 | 27 |
-| K-means++ | **13763.667** | **0.2864** | 1.0563 | 18 |
-| K-means (random init) | 13763.727 | 0.2864 | **1.0562** | 21 |
-
-Ở mức dữ liệu đã tổng hợp theo khách, **chênh lệch SSE và các chỉ số hình dạng cụm giữa các phương pháp rất nhỏ** (sai khác chỉ ở phần thập phân). Điều này cho thấy không gian RFM sau chuẩn hóa tương đối “trơn”, các cực tiểu địa phương của K-means gần nhau. Trong bối cảnh đó, **lợi ích nổi bật của GMS + AFK-MC2 là `n_iter` thấp hơn** (14 so với 18–27), phù hợp khi cần lặp lại thí nghiệm nhiều lần hoặc nhúng pipeline vào luồng batch. Kết luận thực nghiệm: trên tập đa kênh, pipeline đề xuất **cạnh tranh về chất lượng** và **rõ rệt về tốc độ hội tụ**.
-
-![So sánh metric — khách hàng đa kênh](../figures_customer/so_sanh_metric_phuong_phap.png)
-
-*Hình 3. So sánh bốn phương pháp trên `customer_data` (nguồn: `figures_customer/so_sanh_metric_phuong_phap.png`).*
-
-![Heatmap cơ cấu % khách theo cụm — bốn phương pháp (khách hàng đa kênh)](../figures_customer/heatmap_co_cau_cum_theo_phuong_phap.png)
-
-*Hình 4. Cơ cấu cụm theo phương pháp — `customer_data` (nguồn: `figures_customer/heatmap_co_cau_cum_theo_phuong_phap.png`).*
-
-### 4.2.3. Tổng hợp chéo hai tập dữ liệu
-
-| Thành phần | Online Retail II | Khách hàng đa kênh |
-|---|---|---|
-| Quy mô RFM | 5,878 khách | 10,000 khách |
-| GMM (BIC tối ưu trong grid đã chạy) | 12 thành phần | 11 thành phần |
-| Tập con GMS (`rate = 0.5`) | 2,939 điểm | 5,000 điểm |
-| Nhận xét chất lượng | GMS + AFK-MC2 nhỉnh về `SSE`, `DBI` | Các phương pháp gần tương đương về `SSE` / Silhouette / DBI |
-| Nhận xét hội tụ | GMS + AFK-MC2 cho `n_iter` nhỏ nhất | GMS + AFK-MC2 cho `n_iter` nhỏ nhất |
-
 ## 4.3. Customer Segmentation and Application
 
 Sau khi chốt nhãn cụm từ pipeline chính **GMS + AFK-MC2 (sub) + K-means (full)** với `k = 4`, nhóm diễn giải từng cụm bằng **thống kê mô tả RFM** (trung bình, và trong báo cáo chi tiết có thể thêm trung vị từ CSV). Các hình heatmap, boxplot và PCA-2D không thay thế bảng số nhưng giúp **độc giả hình dung phân tầng**: heatmap cho thấy cụm nào “nóng” theo chiều nào sau khi chuẩn hóa theo cột; boxplot cho thấy độ phân tán trong cụm; PCA là chiếu trực quan (không dùng làm đầu vào phân cụm). Phần “Ứng dụng” dưới mỗi bảng là **gợi ý chiến lược**, có thể điều chỉnh theo ngữ cảnh doanh nghiệp.
 
-### 4.3.1. Online Retail II — hồ sơ cụm và gợi ý nghiệp vụ
+### 4.3.1. Hồ sơ cụm và gợi ý nghiệp vụ
 
 ![Tỷ lệ % khách theo cụm (pipeline chính)](../figures/ty_le_khach_theo_cum.png)
 
-*Hình 5. Phân bổ quy mô cụm (Online Retail II).*
+*Hình 3. Phân bổ quy mô cụm (Online Retail II).*
 
 ![Heatmap RFM trung bình theo cụm](../figures/heatmap_rfm_tb_theo_cum.png)
 
-*Hình 6. So sánh RFM (z-score theo cột) giữa các cụm.*
+*Hình 4. So sánh RFM (z-score theo cột) giữa các cụm.*
 
 ![Phân bố R, F, log10(M+1) theo cụm](../figures/boxplot_rfm_theo_cum.png)
 
-*Hình 7. Phân tán hành vi trong từng cụm.*
+*Hình 5. Phân tán hành vi trong từng cụm.*
 
 ![PCA-2D trên R_z, F_z, M_z theo cụm pipeline](../figures/pca2d_cum_pipeline.png)
 
-*Hình 8. Chiếu hai chiều đầu tiên của PCA — chỉ để trực quan.*
+*Hình 6. Chiếu hai chiều đầu tiên của PCA — chỉ để trực quan.*
 
 | Cụm | Tỷ trọng | R, F, M (trung bình) | Nhãn gợi ý | Ứng dụng gợi ý |
 |---|---:|---|---|---|
@@ -226,30 +156,3 @@ Sau khi chốt nhãn cụm từ pipeline chính **GMS + AFK-MC2 (sub) + K-means 
 | Cụm 2 | 27.92% | R 492.27, F 1.73, M 539.84 | Ngủ đông / rủi ro rời bỏ | Win-back, email tái kích hoạt, kiểm soát chi phí remarketing |
 
 Trên dữ liệu giao dịch thật, trục **Monetary** phân hóa mạnh nên cụm VIP nổi bật rõ trong cả heatmap và boxplot; đây là cơ sở để ưu tiên ngân sách giữ chân đúng nhóm.
-
-### 4.3.2. Khách hàng đa kênh — hồ sơ cụm và gợi ý nghiệp vụ
-
-![Tỷ lệ % khách theo cụm (pipeline chính)](../figures_customer/ty_le_khach_theo_cum.png)
-
-*Hình 9. Phân bổ quy mô cụm (`customer_data`).*
-
-![Heatmap RFM trung bình theo cụm](../figures_customer/heatmap_rfm_tb_theo_cum.png)
-
-*Hình 10. Heatmap RFM theo cụm — `customer_data`.*
-
-![Boxplot RFM theo cụm](../figures_customer/boxplot_rfm_theo_cum.png)
-
-*Hình 11. Phân bố RFM theo cụm — `customer_data`.*
-
-![PCA-2D theo cụm pipeline](../figures_customer/pca2d_cum_pipeline.png)
-
-*Hình 12. PCA-2D — `customer_data`.*
-
-| Cụm | Tỷ trọng | R, F, M (trung bình) | Nhãn gợi ý | Ứng dụng gợi ý |
-|---|---:|---|---|---|
-| Cụm 0 | 33.81% | R 22.87, F 19.55, M 1610.28 | Hoạt động tốt, giá trị cao | Giữ chân đa kênh, sản phẩm mới, tối ưu trải nghiệm |
-| Cụm 1 | 31.65% | R 77.00, F 20.00, M 1592.07 | Từng tốt, đang xa dần | Win-back sớm, ưu đãi quay lại |
-| Cụm 2 | 18.54% | R 49.00, F 18.87, M 888.50 | Phổ thông / trung bình | Combo, tăng giá trị đơn |
-| Cụm 3 | 16.00% | R 52.52, F 9.56, M 1467.01 | Chi tiêu cao, mua thưa | Kích thích tần suất, chiến dịch theo chu kỳ |
-
-So với Online Retail II, khoảng biến thiên **M** trên tập đa kênh hẹp hơn (thể hiện qua boxplot), phù hợp với quan sát ở mục 4.2: các phương pháp seeding cho metric gần nhau; **giá trị thực tiễn của pipeline** nghiêng về **ổn định quy trình và tốc độ hội tụ**, trong khi phân khúc vẫn đủ khác biệt để gán chiến lược theo cụm.

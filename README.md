@@ -156,7 +156,7 @@ flowchart LR
 |----------|----------|
 | Dữ liệu | `online_retail_II.csv` → khách hàng cấp RFM |
 | Đặc trưng phân cụm | `R_z`, `F_z`, `M_z` |
-| Số cụm K-means | `k = 4` (có thể đổi trong `notebooks/online_retail/03_AFKMC2.ipynb` hoặc bản `customer_data`) |
+| Số cụm K-means | `k = 4` (có thể đổi trong `notebooks/online_retail/03_AFKMC2.ipynb`) |
 | GMM (GMS / NB2) | Ưu tiên load `models/gmm_rfm.joblib`; không có thì fit fallback |
 | Tỷ lệ lấy mẫu GMS | `SAMPLE_RATE = 0.5` |
 | AFK-MC2 | `m = 200` (chuỗi Markov) |
@@ -181,8 +181,6 @@ python3 -m pip install -r requirements.txt
 3. `notebooks/online_retail/03_AFKMC2.ipynb` → `data/kmeans_init_comparison.csv`, `data/rfm_with_kmeans_clusters.csv`  
 4. `notebooks/online_retail/04_KetQuaVaTrucQuan.ipynb` → bảng CSV bổ sung + **`figures/*.png`**
 
-Luồng tương tự trên `customer_data.csv`: chạy lần lượt các file trong [`notebooks/customer_data/`](notebooks/customer_data/) (01–04 `*_customer_data.ipynb`); kết quả ghi vào `data_customer/`, `models_customer/`, `figures_customer/` (không đè lên Online Retail).
-
 **Cấu trúc thư mục (chính)**
 
 ```
@@ -190,16 +188,11 @@ GMS_AFKMC2/
 ├── README.md
 ├── requirements.txt
 ├── online_retail_II.csv
-├── customer_data.csv     # tùy chọn: luồng notebook customer_data
 ├── notebooks/
-│   ├── online_retail/    # 01–04 Online Retail
-│   └── customer_data/    # 01–04 customer_data (song song)
-├── data/                 # CSV đầu ra (Online Retail)
-├── data_customer/        # CSV đầu ra (customer_data)
+│   └── online_retail/    # 01–04 Online Retail
+├── data/                 # CSV đầu ra
 ├── models/
-├── models_customer/
 ├── figures/
-├── figures_customer/
 └── paper/
 ```
 
