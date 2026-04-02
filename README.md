@@ -97,13 +97,13 @@ p(\mathbf{x}) = \sum_{j=1}^{J} w_j \,\mathcal{N}(\mathbf{x} \mid \boldsymbol{\mu
 ### 3.3 Notebook `notebooks/online_retail/03_AFKMC2.ipynb` — GMS, AFK-MC2, K-means
 
 **GMS (ánh xạ mẫu GMM → điểm thật)**  
-Với mỗi mẫu \(\mathbf{s}\) sinh từ GMM đã fit, chọn chỉ số hàng \(\ell\) sao cho khoảng cách Euclidean có trọng số \(\boldsymbol{\omega}\) nhỏ nhất:
+Với mỗi mẫu \(\mathbf{s}\) sinh từ GMM đã fit, chọn chỉ số hàng \(\ell\) sao cho khoảng cách Euclidean nhỏ nhất:
 
 \[
-\ell = \arg\min_{r} \left\| (\mathbf{x}_r - \mathbf{s}) \odot \boldsymbol{\omega} \right\|_2.
+\ell = \arg\min_{r} \left\| \mathbf{x}_r - \mathbf{s} \right\|_2.
 \]
 
-Trong code mặc định \(\boldsymbol{\omega} = (1,1,1)^\top\). Tập con gồm \(n_{\mathrm{sample}} = \max\bigl(k, \lfloor \rho \cdot N \rfloor\bigr)\) điểm (tỷ lệ \(\rho =\) `SAMPLE_RATE`).
+Tập con gồm \(n_{\mathrm{sample}} = \max\bigl(k, \lfloor \rho \cdot N \rfloor\bigr)\) điểm (tỷ lệ \(\rho =\) `SAMPLE_RATE`).
 
 **AFK-MC2:** dùng package `afkmc2` — hàm `afkmc2.afkmc2(X_{\mathrm{sub}}, k, m)` trả về \(k\) tâm khởi tạo (Markov chain độ dài \(m\)).  
 **Pipeline giống tinh thần paper:** AFK-MC2 trên **\(X_{\mathrm{sub}}\)** → các tâm đó làm `init` cho **K-means trên toàn bộ \(X\)** (`n_init=1`, `algorithm="elkan"`).  
